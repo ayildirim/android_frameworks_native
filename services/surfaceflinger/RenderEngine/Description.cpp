@@ -87,6 +87,16 @@ void Description::setColorMatrix(const mat4& mtx) {
     mColorMatrix = mtx;
     mColorMatrixEnabled = (mtx != identity);
 }
+void Description::setSBSParams(const vec4& win1, const vec4& win2) {
+    const vec4 zero(0.0);
+    mSBSWin1Matrix = win1;
+    mSBSWin2Matrix = win2;
+    mSBSEnabled = (win1 != zero);
+}
 
-
+void Description::setDistortionParams(const vec4& vec) {
+    const vec4 zero(0.0);
+    mDistortVector = vec;
+    mDistEnabled = (vec != zero);
+}
 } /* namespace android */

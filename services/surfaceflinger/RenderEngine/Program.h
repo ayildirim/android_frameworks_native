@@ -84,6 +84,10 @@ private:
 
     /* location of the color uniform */
     GLint mColorLoc;
+    /* location of side-by-side parameters */
+    GLint mWin1MatrixLoc;
+    GLint mWin2MatrixLoc;
+    GLint mDistortParamLoc;
 };
 
 

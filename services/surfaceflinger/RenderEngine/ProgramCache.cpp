@@ -113,7 +113,11 @@ ProgramCache::Key ProgramCache::computeKey(const Description& description) {
     .set(Key::OPACITY_MASK,
             description.mOpaque ? Key::OPACITY_OPAQUE : Key::OPACITY_TRANSLUCENT)
     .set(Key::COLOR_MATRIX_MASK,
-            description.mColorMatrixEnabled ? Key::COLOR_MATRIX_ON :  Key::COLOR_MATRIX_OFF);
+            description.mColorMatrixEnabled ? Key::COLOR_MATRIX_ON :  Key::COLOR_MATRIX_OFF)
+    .set(Key::SBS_MASK,
+	    description.mSBSEnabled ? Key::SBS_ON : Key::SBS_OFF)
+    .set(Key::DIST_MASK,
+	    description.mDistEnabled ? Key::DIST_ON : Key::DIST_OFF);
     return needs;
 }
 
@@ -123,6 +127,16 @@ String8 ProgramCache::generateVertexShader(const Key& needs) {
         vs  << "attribute vec4 texCoords;"
             << "varying vec2 outTexCoords;";
     }
+    if(needs.hasSBSEnabled()) {
+      vs << "varying vec3 fragpos1;"
+	 << "varying vec3 fragpos2;"
+	/* mat3(2.0/SIZE_X, 0.0, -1.0-2.0*OFFSET1_X/SIZE_X, 0.0, 2.0/SIZE_Y, -1.0-2.0*OFFSET1_Y/SIZE_Y, 0.0, 0.0, 0.0);"
+	 * mat3(2.0/SIZE_X, 0.0, -1.0-2.0*OFFSET2_X/SIZE_X, 0.0, 2.0/SIZE_Y, -1.0-2.0*OFFSET2_Y/SIZE_Y, 0.0, 0.0, 0.0);"
+	 */
+	 << "uniform mat3 win1m;" //  = mat3(6.0,0.0,-3,   0.0,6.0,-1.0,    0.0,0.0,0.0);"
+	 << "uniform mat3 win2m;" //  = mat3(6.0,0.0,-3,   0.0,6.0,-5.0,    0.0,0.0,0.0);"
+	;
+    }
     vs << "attribute vec4 position;"
        << "uniform mat4 projection;"
        << "uniform mat4 texture;"
@@ -131,12 +145,21 @@ String8 ProgramCache::generateVertexShader(const Key& needs) {
     if (needs.isTexturing()) {
         vs << "outTexCoords = (texture * texCoords).st;";
     }
+    if (needs.hasSBSEnabled()) {
+	ALOGD("Create vertex shader with sbs");
+	vs << "vec2 x = texCoords.xy;"
+	   << "fragpos1 = (vec3(x,1.0)*win1m+1.0)/2.0;"
+	   << "fragpos2 = (vec3(x,1.0)*win2m+1.0)/2.0;"
+	  ;
+    }
     vs << dedent << "}";
     return vs.getString();
 }
 
 String8 ProgramCache::generateFragmentShader(const Key& needs) {
     Formatter fs;
+    ALOGD("XXXXXX hasSBSEnabled is %d", (int)needs.hasSBSEnabled());
+
     if (needs.getTextureTarget() == Key::TEXTURE_EXT) {
         fs << "#extension GL_OES_EGL_image_external : require";
     }
@@ -159,9 +182,36 @@ String8 ProgramCache::generateFragmentShader(const Key& needs) {
     if (needs.hasColorMatrix()) {
         fs << "uniform mat4 colorMatrix;";
     }
+    if(needs.hasSBSEnabled()) {
+	ALOGD("Create fragment shader with sbs");
+        fs << "varying vec3 fragpos1;"
+	   << "varying vec3 fragpos2;"
+	   << "uniform vec4 distortParam;" //  = vec4(1.0,-0.42,0.24,0.0);"
+	   << "vec2 Distort(vec2 pa) {"
+	   << "   vec2 p = 2.0*pa - 1.0;"
+	   << "   p = clamp(p, vec2(-1.1), vec2(1.1));"
+	   << "   float rSq = p.x*p.x*3.16+p.y*p.y;" // (16/9)^2 = 3.16
+	   << "   return p * (distortParam.x + distortParam.y*rSq + distortParam.z*rSq*rSq + distortParam.w*rSq*rSq*rSq)/2.0 + 0.5;"
+	   << "}";
+
+    }
     fs << "void main(void) {" << indent;
+    
     if (needs.isTexturing()) {
-        fs << "gl_FragColor = texture2D(sampler, outTexCoords);";
+      if(needs.hasSBSEnabled())  {
+	fs << "gl_FragColor=vec4(0.0);"
+	   << "vec2 pos = vec2(-1.0);"
+	   << "if(fragpos1.x >= 0.0 && fragpos1.x <= 1.0 && fragpos1.y >= 0.0 && fragpos1.y <= 1.0)"
+	   << "   pos = Distort(fragpos1.xy);"
+	   << "if(fragpos2.x >= 0.0 && fragpos2.x <= 1.0 && fragpos2.y >= 0.0 && fragpos2.y <= 1.0)"
+	   << "   pos = Distort(fragpos2.xy);"	  
+	   << "if(pos.x >= 0.0 && pos.x <= 1.0 && pos.y >= 0.0 && pos.y <= 1.0)"
+	   << "   gl_FragColor = texture2D(sampler, pos);"
+	  ;
+      }
+      else {
+	fs << "gl_FragColor = texture2D(sampler, outTexCoords);";
+      }
     } else {
         fs << "gl_FragColor = color;";
     }
@@ -193,6 +243,7 @@ String8 ProgramCache::generateFragmentShader(const Key& needs) {
     }
 
     fs << dedent << "}";
+    //ALOGD("shader: ");
     return fs.getString();
 }
 

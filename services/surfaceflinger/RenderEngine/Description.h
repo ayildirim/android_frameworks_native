@@ -53,6 +53,13 @@ class Description {
 
     bool mColorMatrixEnabled;
     mat4 mColorMatrix;
+#if 1
+    bool mSBSEnabled;
+    vec4 mSBSWin1Matrix;
+    vec4 mSBSWin2Matrix;
+    bool mDistEnabled;
+    vec4 mDistortVector;
+#endif
 
 public:
     Description();
@@ -66,7 +73,8 @@ public:
     void setColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha);
     void setProjectionMatrix(const mat4& mtx);
     void setColorMatrix(const mat4& mtx);
-
+    void setSBSParams(const vec4& win1, const vec4& win2);
+    void setDistortionParams(const vec4& vec);
 private:
     bool mUniformsDirty;
 };

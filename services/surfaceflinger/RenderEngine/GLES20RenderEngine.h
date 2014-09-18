@@ -49,7 +49,9 @@ class GLES20RenderEngine : public RenderEngine {
         GLuint height;
         mat4 colorTransform;
     };
-
+    vec4 mSBSWin1;
+    vec4 mSBSWin2;
+    vec4 mDistortion;
     Description mState;
     Vector<Group> mGroupStack;
 
@@ -83,7 +85,7 @@ protected:
 
     virtual void beginGroup(const mat4& colorTransform);
     virtual void endGroup();
-
+    virtual int setSBSMode(const vec4& win1, const vec4& win2, const vec4& dist);
     virtual size_t getMaxTextureSize() const;
     virtual size_t getMaxViewportDims() const;
 };
