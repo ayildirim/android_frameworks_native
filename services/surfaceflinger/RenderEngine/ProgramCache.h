@@ -69,6 +69,14 @@ public:
             COLOR_MATRIX_OFF        =       0x00000000,
             COLOR_MATRIX_ON         =       0x00000020,
             COLOR_MATRIX_MASK       =       0x00000020,
+
+	    SBS_OFF		    =       0x00000000,
+	    SBS_ON		    =       0x00000040,
+	    SBS_MASK		    =       0x00000040,
+
+	    DIST_OFF		    =       0x00000000,
+	    DIST_ON		    =       0x00000080,
+	    DIST_MASK		    =       0x00000080,
         };
 
         inline Key() : mKey(0) { }
@@ -97,7 +105,12 @@ public:
         inline bool hasColorMatrix() const {
             return (mKey & COLOR_MATRIX_MASK) == COLOR_MATRIX_ON;
         }
-
+	inline bool hasSBSEnabled() const {
+	    return (mKey & SBS_MASK) == SBS_ON;
+	}
+	inline bool hasDistEnabled() const {
+	    return (mKey & DIST_MASK) == DIST_ON;
+	}
         // this is the definition of a friend function -- not a method of class Needs
         friend inline int strictly_order_type(const Key& lhs, const Key& rhs) {
             return  (lhs.mKey < rhs.mKey) ? 1 : 0;

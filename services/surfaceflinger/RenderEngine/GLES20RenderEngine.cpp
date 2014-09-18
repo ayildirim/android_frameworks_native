@@ -36,8 +36,9 @@ namespace android {
 // ---------------------------------------------------------------------------
 
 GLES20RenderEngine::GLES20RenderEngine() :
-        mVpWidth(0), mVpHeight(0) {
-
+       mVpWidth(0), mVpHeight(0),
+       mSBSWin1(0.0), mSBSWin2(0.0), mDistortion(0.0)
+{
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxTextureSize);
     glGetIntegerv(GL_MAX_VIEWPORT_DIMS, mMaxViewportDims);
 
@@ -279,7 +280,7 @@ void GLES20RenderEngine::endGroup() {
 
     // set our state
     Texture texture(Texture::TEXTURE_2D, group.texture);
-    texture.setDimensions(group.width, group.height);
+    texture.setDimensions(group.width+2, group.height+2);
     glBindTexture(GL_TEXTURE_2D, group.texture);
 
     mState.setPlaneAlpha(1.0f);
@@ -287,6 +288,8 @@ void GLES20RenderEngine::endGroup() {
     mState.setOpaque(false);
     mState.setTexture(texture);
     mState.setColorMatrix(group.colorTransform);
+    mState.setSBSParams(mSBSWin1, mSBSWin2);
+    mState.setDistortionParams(mDistortion);
     glDisable(GL_BLEND);
 
     Mesh mesh(Mesh::TRIANGLE_FAN, 4, 2, 2);
@@ -305,9 +308,18 @@ void GLES20RenderEngine::endGroup() {
     // reset color matrix
     mState.setColorMatrix(mat4());
 
+    mState.setSBSParams(vec4(0.0), vec4(0.0));
+    mState.setDistortionParams(vec4(0.0));
     // free our fbo and texture
     glDeleteFramebuffers(1, &group.fbo);
     glDeleteTextures(1, &group.texture);
+}
+
+int GLES20RenderEngine::setSBSMode(const vec4& win1, const vec4& win2, const vec4& dist) {
+  mSBSWin1 = win1;
+  mSBSWin2 = win2;
+  mDistortion = dist;
+  return 1;
 }
 
 void GLES20RenderEngine::dump(String8& result) {
