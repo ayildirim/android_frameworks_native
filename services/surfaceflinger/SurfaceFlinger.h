@@ -46,6 +46,8 @@
 
 #include <private/gui/LayerState.h>
 
+#include <ui/mat4.h>
+
 #include "Barrier.h"
 #include "DisplayDevice.h"
 #include "DispSync.h"
@@ -478,6 +480,19 @@ private:
 
     Daltonizer mDaltonizer;
     bool mDaltonize;
+    
+    /* Side-by-Side view and lens distortion correction
+     */
+#define OFFSET1_X  0.27
+#define OFFSET1_Y  0.02
+#define OFFSET2_X  0.27
+#define OFFSET2_Y  0.52
+#define SIZE_X     0.46
+#define SIZE_Y     0.46
+    int  mSBSEnabled;
+    vec4 mSBSWin1 = vec4(2.0/SIZE_X, -1-2*OFFSET1_X/SIZE_X, 2.0/SIZE_Y, -1-2*OFFSET1_Y/SIZE_Y);
+    vec4 mSBSWin2 = vec4(2.0/SIZE_X, -1-2*OFFSET2_X/SIZE_X, 2.0/SIZE_Y, -1-2*OFFSET2_Y/SIZE_Y);
+    vec4 mDistortion = vec4(1,-0.22,0.24,0.0);
 };
 
 }; // namespace android

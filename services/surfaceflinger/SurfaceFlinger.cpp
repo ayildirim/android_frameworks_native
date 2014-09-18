@@ -44,6 +44,7 @@
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/PixelFormat.h>
 #include <ui/UiConfig.h>
+#include <ui/vec4.h>
 
 #include <utils/misc.h>
 #include <utils/String8.h>
@@ -152,7 +153,8 @@ SurfaceFlinger::SurfaceFlinger()
         mBootFinished(false),
         mPrimaryHWVsyncEnabled(false),
         mHWVsyncAvailable(false),
-        mDaltonize(false)
+	mDaltonize(false),
+        mSBSEnabled(false)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -1062,7 +1064,7 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize) {
+                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mSBSEnabled) {
                                 cur->setSkip(true);
                             }
                         }
@@ -1682,13 +1684,20 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         }
     }
 
-    if (CC_LIKELY(!mDaltonize)) {
-        doComposeSurfaces(hw, dirtyRegion);
-    } else {
+    if (CC_UNLIKELY(mDaltonize)) {
         RenderEngine& engine(getRenderEngine());
         engine.beginGroup(mDaltonizer());
         doComposeSurfaces(hw, dirtyRegion);
         engine.endGroup();
+    } else if(mSBSEnabled) {
+        RenderEngine& engine(getRenderEngine());
+        engine.beginGroup(mat4());
+        doComposeSurfaces(hw, dirtyRegion);
+        engine.endGroup();
+    }
+    else {
+        doComposeSurfaces(hw, dirtyRegion);
+
     }
 
     // update the swap region and clear the dirty region
@@ -2738,7 +2747,51 @@ status_t SurfaceFlinger::onTransact(
                 mDaltonize = n > 0;
                 invalidateHwcGeometry();
                 repaintEverything();
+		return NO_ERROR;
             }
+	    case 1042: {
+	        int cmd = data.readInt32();
+		RenderEngine& engine(getRenderEngine());
+		switch(cmd) {
+		case 0:		// Disable
+		  ALOGD("SBS: Disable");
+		  engine.setSBSMode(vec4(0.0), vec4(0.0), vec4(0.0));
+		  mSBSEnabled = 0;
+		  break;
+		case 1:		// Enable
+		  ALOGD("SBS: Enable");
+		  engine.setSBSMode(mSBSWin1, mSBSWin2, mDistortion);
+		  mSBSEnabled = 1;
+		  break;
+		case 2:		// Set win1.
+		  ALOGD("SBS: Set win1");
+		  for(int i = 0; i < 4; i++)
+		    mSBSWin1[i] = data.readInt32()/1000000.0;
+		  engine.setSBSMode(mSBSWin1, mSBSWin2, mDistortion);
+		  break;
+		case 3:		// Set win2
+		  ALOGD("SBS: Set win2");
+		  for(int i = 0; i < 4; i++)
+		    mSBSWin2[i] = data.readInt32()/1000000.0;
+		  engine.setSBSMode(mSBSWin1, mSBSWin2, mDistortion);
+		  break;
+		case 4:		// Set distortion
+		  ALOGD("SBS: Set distortion");
+		  for(int i = 0; i < 4; i++) 
+		    mDistortion[i] = data.readInt32()/1000000.0;
+		  engine.setSBSMode(mSBSWin1, mSBSWin2, mDistortion);
+		  break;
+		default:
+		  ALOGD("SBS: Unknown cmd");
+		  reply->writeInt32(1);
+		  break;
+		}
+		ALOGD("SBS: invalidate and repaint");
+                invalidateHwcGeometry();
+                repaintEverything();
+		return NO_ERROR;
+
+	    }
             return NO_ERROR;
         }
     }

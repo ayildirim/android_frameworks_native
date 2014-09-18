@@ -59,6 +59,9 @@ Program::Program(const ProgramCache::Key& needs, const char* vertex, const char*
         mInitialized = true;
 
         mColorMatrixLoc = glGetUniformLocation(programId, "colorMatrix");
+	mWin1MatrixLoc = glGetUniformLocation(programId, "win1m");
+	mWin2MatrixLoc = glGetUniformLocation(programId, "win2m");
+	mDistortParamLoc = glGetUniformLocation(programId, "distortParam");
         mProjectionMatrixLoc = glGetUniformLocation(programId, "projection");
         mTextureMatrixLoc = glGetUniformLocation(programId, "texture");
         mSamplerLoc = glGetUniformLocation(programId, "sampler");
@@ -141,6 +144,23 @@ void Program::setUniforms(const Description& desc) {
     if (mColorMatrixLoc >= 0) {
         glUniformMatrix4fv(mColorMatrixLoc, 1, GL_FALSE, desc.mColorMatrix.asArray());
     }
+#if 1
+    if (mWin1MatrixLoc >= 0) {
+        float a[9] = { desc.mSBSWin1Matrix[0],	0.0,				desc.mSBSWin1Matrix[1],
+		       0.0,			desc.mSBSWin1Matrix[2],		desc.mSBSWin1Matrix[3],
+		       0.0,			0.0,				0.0};
+        glUniformMatrix3fv(mWin1MatrixLoc, 1, GL_FALSE, a);
+    }
+    if (mWin2MatrixLoc >= 0) {
+        float a[9] = { desc.mSBSWin2Matrix[0],	0.0,				desc.mSBSWin2Matrix[1],
+		       0.0,			desc.mSBSWin2Matrix[2],		desc.mSBSWin2Matrix[3],
+		       0.0,			0.0,				0.0};
+        glUniformMatrix3fv(mWin2MatrixLoc, 1, GL_FALSE, a);
+    }
+    if (mDistortParamLoc >= 0) {
+      glUniform4f(mDistortParamLoc, desc.mDistortVector[0], desc.mDistortVector[1], desc.mDistortVector[2], desc.mDistortVector[3]);
+    }
+#endif
     // these uniforms are always present
     glUniformMatrix4fv(mProjectionMatrixLoc, 1, GL_FALSE, desc.mProjectionMatrix.asArray());
 }

@@ -102,7 +102,7 @@ public:
     // transformed by the given color transform when endGroup() is called.
     virtual void beginGroup(const mat4& colorTransform) = 0;
     virtual void endGroup() = 0;
-
+    virtual int setSBSMode(const vec4& win1, const vec4& win2, const vec4& dist) { return -1;}
     // queries
     virtual size_t getMaxTextureSize() const = 0;
     virtual size_t getMaxViewportDims() const = 0;
