@@ -74,6 +74,7 @@
 #include "DisplayHardware/VirtualDisplaySurface.h"
 
 #include "Effects/Daltonizer.h"
+#include "SBS.h"
 
 #include "RenderEngine/RenderEngine.h"
 #include <cutils/compiler.h>
@@ -122,6 +123,9 @@ const String16 sAccessSurfaceFlinger("android.permission.ACCESS_SURFACE_FLINGER"
 const String16 sReadFramebuffer("android.permission.READ_FRAME_BUFFER");
 const String16 sDump("android.permission.DUMP");
 
+static SBS mSBS;
+
+
 // ---------------------------------------------------------------------------
 
 SurfaceFlinger::SurfaceFlinger()
@@ -151,6 +155,8 @@ SurfaceFlinger::SurfaceFlinger()
         mHasColorMatrix(false)
 {
     ALOGI("SurfaceFlinger is starting");
+
+    mSBS.flags = 0;
 
     // debugging stuff...
     char value[PROPERTY_VALUE_MAX];
@@ -1047,7 +1053,7 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix) {
+                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix || (mSBS.flags & SBS_FLAG_ENABLED)) {
                                 cur->setSkip(true);
                             }
                         }
@@ -1742,7 +1748,7 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         }
     }
 
-    if (CC_LIKELY(!mDaltonize && !mHasColorMatrix)) {
+    if (CC_LIKELY(!mDaltonize && !mHasColorMatrix && !(mSBS.flags & SBS_FLAG_ENABLED))) {
         if (!doComposeSurfaces(hw, dirtyRegion)) return;
     } else {
         RenderEngine& engine(getRenderEngine());
@@ -1750,7 +1756,15 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         if (mDaltonize) {
             colorMatrix = colorMatrix * mDaltonizer();
         }
-        engine.beginGroup(colorMatrix);
+        if(mSBS.flags & SBS_FLAG_ENABLED) {
+            mat4 id;
+	    mSBS.isLandscape = (hw->getOrientation() == DisplayState::eOrientation90);
+            engine.beginGroup(colorMatrix, &mSBS);
+        }
+        else {
+            engine.beginGroup(colorMatrix, 0);
+        }
+
         doComposeSurfaces(hw, dirtyRegion);
         engine.endGroup();
     }
@@ -2830,7 +2844,17 @@ status_t SurfaceFlinger::onTransact(
                 mPrimaryDispSync.setRefreshSkipCount(n);
                 return NO_ERROR;
             }
-        }
+	    case 4711: {
+	        mSBS.flags = data.readInt32();
+		mSBS.zoom = data.readInt32();
+		mSBS.imgdist = data.readInt32();
+	
+		ALOGW("SBS:f=%x zoom=%d imgdist=%d\n", mSBS.flags, mSBS.zoom, mSBS.imgdist);
+                invalidateHwcGeometry();
+                repaintEverything();
+                return NO_ERROR;
+	    }
+	}
     }
     return err;
 }

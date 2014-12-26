@@ -34,6 +34,7 @@
 #include "Description.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include "SBS.h"
 
 // ---------------------------------------------------------------------------
 namespace android {
@@ -243,7 +244,7 @@ void GLES20RenderEngine::drawMesh(const Mesh& mesh) {
     }
 }
 
-void GLES20RenderEngine::beginGroup(const mat4& colorTransform) {
+void GLES20RenderEngine::beginGroup(const mat4& colorTransform, SBS* sbs) {
 
     GLuint tname, name;
     // create the texture
@@ -266,6 +267,7 @@ void GLES20RenderEngine::beginGroup(const mat4& colorTransform) {
     group.width = mVpWidth;
     group.height = mVpHeight;
     group.colorTransform = colorTransform;
+    group.sbs = sbs;
 
     mGroupStack.push(group);
 }
@@ -282,6 +284,9 @@ void GLES20RenderEngine::endGroup() {
     }
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
+    glClearColor(0,0,0,1);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     // set our state
     Texture texture(Texture::TEXTURE_2D, group.texture);
     texture.setDimensions(group.width, group.height);
@@ -297,16 +302,61 @@ void GLES20RenderEngine::endGroup() {
     Mesh mesh(Mesh::TRIANGLE_FAN, 4, 2, 2);
     Mesh::VertexArray<vec2> position(mesh.getPositionArray<vec2>());
     Mesh::VertexArray<vec2> texCoord(mesh.getTexCoordArray<vec2>());
-    position[0] = vec2(0, 0);
-    position[1] = vec2(group.width, 0);
-    position[2] = vec2(group.width, group.height);
-    position[3] = vec2(0, group.height);
-    texCoord[0] = vec2(0, 0);
-    texCoord[1] = vec2(1, 0);
-    texCoord[2] = vec2(1, 1);
-    texCoord[3] = vec2(0, 1);
-    drawMesh(mesh);
 
+    if(!(group.sbs->flags & SBS_FLAG_ENABLED)) {
+      position[0] = vec2(0, 0);
+      position[1] = vec2(group.width, 0);
+      position[2] = vec2(group.width, group.height);
+      position[3] = vec2(0, group.height);
+      texCoord[0] = vec2(0, 0);
+      texCoord[1] = vec2(1, 0);
+      texCoord[2] = vec2(1, 1);
+      texCoord[3] = vec2(0, 1);
+    } else {
+      float sf = group.sbs->zoom/255.0;
+      int imgdist = group.sbs->imgdist;
+      unsigned int wo1, ho1, wo2, ho2, w, h;
+      if(group.sbs->isLandscape) {
+	texCoord[0] = vec2(0, 0);
+	texCoord[1] = vec2(1, 0);
+	texCoord[2] = vec2(1, 1);
+	texCoord[3] = vec2(0, 1);
+
+	h = sf*group.height/2;
+	w = sf*group.width/2;
+      }
+      else {			// Portrait
+	texCoord[0] = vec2(1, 0);
+	texCoord[1] = vec2(1, 1);
+	texCoord[2] = vec2(0, 1);
+	texCoord[3] = vec2(0, 0);
+
+	if(100*group.height/group.width >= 100*group.width/(group.height/2)) {
+	  w = sf*group.height*group.width/group.height;
+	  h = sf*group.width*group.width/group.height;
+	} else  {
+	  w = sf*group.height*(group.height/2)/group.width;
+	  h = sf*group.width*(group.height/2)/group.width;
+	}
+      }
+      if(h > imgdist)
+         imgdist = h;
+      wo1 = wo2 = (group.width - w)/2;
+      ho1 = (group.height - h - imgdist)/2;
+      ho2 = (group.height - h + imgdist)/2;
+
+      position[0] = vec2(wo1,   ho1);
+      position[1] = vec2(wo1+w, ho1);
+      position[2] = vec2(wo1+w, ho1+h);
+      position[3] = vec2(wo1,   ho1+h);
+      drawMesh(mesh);
+
+      position[0] = vec2(wo2,   ho2);
+      position[1] = vec2(wo2+w, ho2);
+      position[2] = vec2(wo2+w, ho2+h);
+      position[3] = vec2(wo2,   ho2+h);
+      drawMesh(mesh);
+    }
     // reset color matrix
     mState.setColorMatrix(mat4());
 
