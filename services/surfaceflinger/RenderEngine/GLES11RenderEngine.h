@@ -60,7 +60,7 @@ protected:
 
     virtual void drawMesh(const Mesh& mesh);
 
-    virtual void beginGroup(const mat4& colorTransform);
+    virtual void beginGroup(const mat4& colorTransform, int sbs = 0);
     virtual void endGroup();
 
     virtual size_t getMaxTextureSize() const;

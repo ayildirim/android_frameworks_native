@@ -109,7 +109,7 @@ public:
     // grouping
     // creates a color-transform group, everything drawn in the group will be
     // transformed by the given color transform when endGroup() is called.
-    virtual void beginGroup(const mat4& colorTransform) = 0;
+    virtual void beginGroup(const mat4& colorTransform, int sbs = false) = 0;
     virtual void endGroup() = 0;
 
     // queries

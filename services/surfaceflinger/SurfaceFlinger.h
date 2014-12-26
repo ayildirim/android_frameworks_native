@@ -535,6 +535,7 @@ private:
 #if defined(SAMSUNG_HDMI_SUPPORT) && defined(SAMSUNG_EXYNOS5250)
     SecHdmiClient *                         mHdmiClient;
 #endif
+    int mSBS;
 };
 
 }; // namespace android

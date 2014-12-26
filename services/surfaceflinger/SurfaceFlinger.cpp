@@ -167,7 +167,8 @@ SurfaceFlinger::SurfaceFlinger()
         mGpuTileRenderEnable(false),
         mPrimaryHWVsyncEnabled(false),
         mHWVsyncAvailable(false),
-        mDaltonize(false)
+        mDaltonize(false),
+        mSBS(0)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -1148,7 +1149,7 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize) {
+                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || mSBS) {
                                 cur->setSkip(true);
                             }
                         }
@@ -1969,11 +1970,21 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         }
     }
 
-    if (CC_LIKELY(!mDaltonize)) {
+    if (CC_LIKELY(!mDaltonize && !mSBS)) {
         doComposeSurfaces(hw, dirtyRegion);
     } else {
         RenderEngine& engine(getRenderEngine());
-        engine.beginGroup(mDaltonizer());
+        if(mSBS) {
+            int sbs = mSBS*16;
+            if(hw->getOrientation() == DisplayState::eOrientation90)  sbs |= 1;
+            else sbs |= 2;
+            mat4 id;
+            engine.beginGroup(id, sbs);
+        }
+        else {
+            engine.beginGroup(mDaltonizer(), 0);
+        }
+
         doComposeSurfaces(hw, dirtyRegion);
         engine.endGroup();
     }
@@ -3130,8 +3141,14 @@ status_t SurfaceFlinger::onTransact(
                 mDaltonize = n > 0;
                 invalidateHwcGeometry();
                 repaintEverything();
+		return NO_ERROR;
             }
-            return NO_ERROR;
+            case 4711: 
+                mSBS = data.readInt32();
+                ALOGW("SBS mode set to %d\n", mSBS);
+                invalidateHwcGeometry();
+                repaintEverything();
+                return NO_ERROR;
         }
     }
     return err;

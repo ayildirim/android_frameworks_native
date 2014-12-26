@@ -48,6 +48,7 @@ class GLES20RenderEngine : public RenderEngine {
         GLuint width;
         GLuint height;
         mat4 colorTransform;
+        int sbs;		/* 0 - off, 1 - landscape, 2 - portrati */
     };
 
     Description mState;
@@ -81,7 +82,7 @@ protected:
 
     virtual void drawMesh(const Mesh& mesh);
 
-    virtual void beginGroup(const mat4& colorTransform);
+    virtual void beginGroup(const mat4& colorTransform, int sbs = 0);
     virtual void endGroup();
 
     virtual size_t getMaxTextureSize() const;
