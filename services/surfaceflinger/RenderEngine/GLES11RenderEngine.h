@@ -32,6 +32,7 @@ namespace android {
 class String8;
 class Mesh;
 class Texture;
+class SBS;
 
 class GLES11RenderEngine : public RenderEngine {
     GLuint mProtectedTexName;
@@ -60,7 +61,7 @@ protected:
 
     virtual void drawMesh(const Mesh& mesh);
 
-    virtual void beginGroup(const mat4& colorTransform);
+    virtual void beginGroup(const mat4& colorTransform, SBS* sbs);
     virtual void endGroup();
 
     virtual size_t getMaxTextureSize() const;

@@ -71,6 +71,7 @@
 #include "DisplayHardware/VirtualDisplaySurface.h"
 
 #include "Effects/Daltonizer.h"
+#include "SBS.h"
 
 #include "RenderEngine/RenderEngine.h"
 #include <cutils/compiler.h>
@@ -127,6 +128,9 @@ const String16 sAccessSurfaceFlinger("android.permission.ACCESS_SURFACE_FLINGER"
 const String16 sReadFramebuffer("android.permission.READ_FRAME_BUFFER");
 const String16 sDump("android.permission.DUMP");
 
+static SBS mSBS;
+
+
 // ---------------------------------------------------------------------------
 
 SurfaceFlinger::SurfaceFlinger()
@@ -155,6 +159,8 @@ SurfaceFlinger::SurfaceFlinger()
         mDaltonize(false)
 {
     ALOGI("SurfaceFlinger is starting");
+
+    mSBS.flags = 0;
 
     // debugging stuff...
     char value[PROPERTY_VALUE_MAX];
@@ -1062,7 +1068,7 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize) {
+                            if (mDebugDisableHWC || mDebugRegion || mDaltonize || (mSBS.flags & SBS_FLAG_ENABLED)) {
                                 cur->setSkip(true);
                             }
                         }
@@ -1682,12 +1688,19 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         }
     }
 
-    if (CC_LIKELY(!mDaltonize)) {
+    if (CC_LIKELY(!mDaltonize && !(mSBS.flags & SBS_FLAG_ENABLED))) {
         doComposeSurfaces(hw, dirtyRegion);
     } else {
         RenderEngine& engine(getRenderEngine());
-        engine.beginGroup(mDaltonizer());
-        doComposeSurfaces(hw, dirtyRegion);
+        if(mSBS.flags & SBS_FLAG_ENABLED) {
+            mat4 id;
+	    mSBS.isLandscape = (hw->getOrientation() == DisplayState::eOrientation90);
+            engine.beginGroup(id, &mSBS);
+        }
+        else {
+	    engine.beginGroup(mDaltonizer(), 0);
+        }
+	doComposeSurfaces(hw, dirtyRegion);
         engine.endGroup();
     }
 
@@ -2740,6 +2753,17 @@ status_t SurfaceFlinger::onTransact(
                 repaintEverything();
             }
             return NO_ERROR;
+	    case 4711: {
+	        mSBS.flags = data.readInt32();
+		mSBS.zoom = data.readInt32();
+		mSBS.imgdist = data.readInt32();
+	
+		ALOGW("SBS:f=%x zoom=%d imgdist=%d\n", mSBS.flags, mSBS.zoom, mSBS.imgdist);
+                invalidateHwcGeometry();
+                repaintEverything();
+                return NO_ERROR;
+	    }
+
         }
     }
     return err;
@@ -2954,7 +2978,7 @@ void SurfaceFlinger::renderScreenImplLocked(
                     if (filtering) layer->setFiltering(false);
                 }
             }
-        }
+	}
     }
 
     // compositionComplete is needed for older driver
